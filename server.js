@@ -159,13 +159,12 @@ app.use('/stk-callback', (req, res, next) => {
 });
 // Allow specific origins (recommended for production)
 const allowedOrigins = [
-    'http://localhost:3000',
+    'https://www.daimapay.com',
     'https://daimapay.com',
     'https://daimapay-51406.web.app',
     'https://daimapay.web.app',
     'https://daimapay-wallet.web.app',
     'https://new-wallet.web.app'
-
 ];
 app.use(cors({
     origin: function (origin, callback) {
@@ -5064,4 +5063,3 @@ app.get('/api/user/bulk-statistics/:userId', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch user bulk statistics' });
   }
 }); 
-
