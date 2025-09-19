@@ -1254,14 +1254,14 @@ app.post('/stk-push', stkPushLimiter, async (req, res) => {
             // M-Pesa did not accept the push request (e.g., invalid number, insufficient balance in your shortcode)
             logger.error('❌ STK Push Request Failed by Daraja:', stkPushResponse.data);
             // Log this failure in errors collection
-            await errorsCollection.add({
+            await errorsCollection.doc(`error_${Date.now()}_${CheckoutRequestID}`).set({
                 type: 'STK_PUSH_INITIATION_FAILED_BY_DARJA',
                 error: ResponseDescription,
                 requestPayload: stkPushPayload,
                 mpesaResponse: stkPushResponse.data,
                 createdAt: FieldValue.serverTimestamp(),
                 checkoutRequestID: CheckoutRequestID, // Log this ID even if no record was created for it
-            });
+            }, { merge: true });
 
             // No stk_transaction document created if Daraja rejected the request
             return res.status(500).json({ success: false, message: ResponseDescription || 'STK Push request failed.' });
@@ -1277,14 +1277,14 @@ app.post('/stk-push', stkPushLimiter, async (req, res) => {
 
         const errorMessage = error.response ? (error.response.data.errorMessage || error.response.data.MpesaError || error.response.data) : error.message;
 
-        await errorsCollection.add({
+        await errorsCollection.doc(`error_${Date.now()}_${CheckoutRequestID || 'unknown'}`).set({
             type: 'STK_PUSH_CRITICAL_INITIATION_ERROR',
             error: errorMessage,
             requestBody: req.body,
             stack: error.stack,
             createdAt: FieldValue.serverTimestamp(),
             checkoutRequestID: CheckoutRequestID || 'N/A', // Log the ID if available
-        });
+        }, { merge: true });
 
         res.status(500).json({ success: false, message: 'Failed to initiate STK Push.', error: errorMessage });
     }
