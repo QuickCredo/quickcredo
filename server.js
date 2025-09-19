@@ -108,6 +108,8 @@ console.log('🔧 Using service account key file...');
 console.log('🔍 DEBUG: FIRESTORE_EMULATOR_HOST:', process.env.FIRESTORE_EMULATOR_HOST);
 console.log('🔍 DEBUG: NODE_ENV:', process.env.NODE_ENV);
 console.log('🔍 DEBUG: RENDER:', process.env.RENDER);
+console.log('🔍 DEBUG: All environment variables with FIRESTORE:', Object.keys(process.env).filter(key => key.includes('FIRESTORE')));
+console.log('🔍 DEBUG: All environment variables with EMULATOR:', Object.keys(process.env).filter(key => key.includes('EMULATOR')));
 
 try {
     // Read the service account key file
@@ -120,6 +122,16 @@ try {
         projectId: process.env.GCP_PROJECT_ID,
         credentials: serviceAccountKey,
     };
+    
+    // FORCE: Explicitly disable emulator settings
+    if (process.env.FIRESTORE_EMULATOR_HOST) {
+        console.log('⚠️ WARNING: FIRESTORE_EMULATOR_HOST is set, but we are forcing production mode');
+        console.log('🔍 DEBUG: FIRESTORE_EMULATOR_HOST value:', process.env.FIRESTORE_EMULATOR_HOST);
+        // Explicitly set to undefined to override environment
+        firestoreConfig.host = undefined;
+        firestoreConfig.ssl = true;
+    }
+    
     console.log('🔍 DEBUG: Firestore config:', JSON.stringify(firestoreConfig, null, 2));
     
     firestore = new Firestore(firestoreConfig);
