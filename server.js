@@ -123,14 +123,21 @@ try {
         credentials: serviceAccountKey,
     };
     
-    // FORCE: Explicitly disable emulator settings
-    if (process.env.FIRESTORE_EMULATOR_HOST) {
-        console.log('⚠️ WARNING: FIRESTORE_EMULATOR_HOST is set, but we are forcing production mode');
-        console.log('🔍 DEBUG: FIRESTORE_EMULATOR_HOST value:', process.env.FIRESTORE_EMULATOR_HOST);
-        // Explicitly set to undefined to override environment
-        firestoreConfig.host = undefined;
-        firestoreConfig.ssl = true;
-    }
+    // FORCE: Completely override any emulator settings
+    console.log('🔍 DEBUG: FIRESTORE_EMULATOR_HOST before override:', process.env.FIRESTORE_EMULATOR_HOST);
+    
+    // Completely remove emulator environment variables
+    delete process.env.FIRESTORE_EMULATOR_HOST;
+    delete process.env.FIRESTORE_EMULATOR_AUTH_EMULATOR_HOST;
+    
+    console.log('🔍 DEBUG: FIRESTORE_EMULATOR_HOST after override:', process.env.FIRESTORE_EMULATOR_HOST);
+    
+    // Force production configuration
+    firestoreConfig.host = undefined;
+    firestoreConfig.ssl = true;
+    firestoreConfig.port = undefined;
+    
+    console.log('⚠️ FORCED: Production Firestore mode - all emulator settings removed');
     
     console.log('🔍 DEBUG: Firestore config:', JSON.stringify(firestoreConfig, null, 2));
     
