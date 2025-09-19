@@ -1559,12 +1559,15 @@ async function processAirtimeFulfillment({
                 requestType: requestType,
                 createdAt: now,
             });
-            await transactionsCollection.doc(transactionId).update({
+            await transactionsCollection.doc(transactionId).set({
+                transactionID: transactionId,
+                type: 'C2B_PAYMENT',
                 status: 'RECEIVED_FULFILLMENT_FAILED',
                 fulfillmentStatus: 'FAILED_UNKNOWN_CARRIER',
                 errorMessage: errorMessage,
                 lastUpdated: now,
-            });
+                createdAt: now,
+            }, { merge: true });
             return { success: false, status: 'FAILED_UNKNOWN_CARRIER', error: errorMessage };
         }
 
@@ -1935,11 +1938,14 @@ async function processAirtimeFulfillment({
         // Ensure main transaction record reflects critical error
         if (transactionId) {
             try {
-                await transactionsCollection.doc(transactionId).update({
+                await transactionsCollection.doc(transactionId).set({
+                    transactionID: transactionId,
+                    type: 'C2B_PAYMENT',
                     status: 'CRITICAL_FULFILLMENT_ERROR',
                     errorMessage: `Critical server error during airtime fulfillment: ${error.message}`,
                     lastUpdated: now,
-                });
+                    createdAt: now,
+                }, { merge: true });
             } catch (updateError) {
                 logger.error(`❌ Failed to update transaction ${transactionId} after critical fulfillment error:`, updateError.message);
             }
