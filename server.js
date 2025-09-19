@@ -3683,109 +3683,109 @@ function generateTimestamp() {
 
 // COMMENTED OUT FOR TESTING - BULK AIRTIME ENDPOINT
 // app.post('/api/bulk-airtime', async (req, res) => {
-  const { requests, totalAmount, userId } = req.body;
- logger.info(`🔍 Incoming bulk-airtime payload: ${JSON.stringify(req.body)}`);
+//   const { requests, totalAmount, userId } = req.body;
+//  logger.info(`🔍 Incoming bulk-airtime payload: ${JSON.stringify(req.body)}`);
 
-  if (!Array.isArray(requests) || requests.length === 0 || !totalAmount || !userId) {
-    return res.status(400).json({ error: 'Missing required fields.' });
-  }
+//   if (!Array.isArray(requests) || requests.length === 0 || !totalAmount || !userId) {
+//     return res.status(400).json({ error: 'Missing required fields.' });
+//   }
 
-  // Fetch discounts
-  let safaricomPct = 10, africastalkingPct = 2;
-  try {
-    const safDoc = await firestore.collection('airtime_bonuses').doc('current_settings').get();
-    if (safDoc.exists) {
-      const safData = safDoc.data();
-      if (safData.safaricomPercentage !== undefined) safaricomPct = Number(safData.safaricomPercentage);
-      if (safData.africastalkingPercentage !== undefined) africastalkingPct = Number(safData.africastalkingPercentage);
-    }
-  } catch (err) {
-    logger.warn('⚠️ Failed to fetch discount settings. Using defaults.');
-  }
+//   // Fetch discounts
+//   let safaricomPct = 10, africastalkingPct = 2;
+//   try {
+//     const safDoc = await firestore.collection('airtime_bonuses').doc('current_settings').get();
+//     if (safDoc.exists) {
+//       const safData = safDoc.data();
+//       if (safData.safaricomPercentage !== undefined) safaricomPct = Number(safData.safaricomPercentage);
+//       if (safData.africastalkingPercentage !== undefined) africastalkingPct = Number(safData.africastalkingPercentage);
+//     }
+//   } catch (err) {
+//     logger.warn('⚠️ Failed to fetch discount settings. Using defaults.');
+//   }
 
-  // Calculate backend discounted total
-  const discountedTotal = requests.reduce((sum, r) => {
-    const telco = (r.telco || '').toLowerCase();
-    const amount = Number(r.amount || 0);
+//   // Calculate backend discounted total
+//   const discountedTotal = requests.reduce((sum, r) => {
+//     const telco = (r.telco || '').toLowerCase();
+//     const amount = Number(r.amount || 0);
 
-    if (telco === 'safaricom') {
-      return sum + (amount - (amount * safaricomPct / 100));
-    } else if (['airtel', 'telkom', 'equitel', 'faiba'].includes(telco)) {
-      return sum + (amount - (amount * africastalkingPct / 100));
-    } else {
-      return sum + amount;
-    }
-  }, 0);
+//     if (telco === 'safaricom') {
+//       return sum + (amount - (amount * safaricomPct / 100));
+//     } else if (['airtel', 'telkom', 'equitel', 'faiba'].includes(telco)) {
+//       return sum + (amount - (amount * africastalkingPct / 100));
+//     } else {
+//       return sum + amount;
+//     }
+//   }, 0);
 
-  // Validate totalAmount from frontend
-  if (Math.abs(Number(totalAmount) - discountedTotal) > 0.01) {
-    logger.warn(`❌ Discount mismatch - client: ${totalAmount}, server: ${discountedTotal}`);
-    return res.status(400).json({ error: 'totalAmount does not match discounted sum of request amounts.' });
-  }
+//   // Validate totalAmount from frontend
+//   if (Math.abs(Number(totalAmount) - discountedTotal) > 0.01) {
+//     logger.warn(`❌ Discount mismatch - client: ${totalAmount}, server: ${discountedTotal}`);
+//     return res.status(400).json({ error: 'totalAmount does not match discounted sum of request amounts.' });
+//   }
 
-  // Fetch organization data
-  let organizationName = 'unknown';
-  let userRef = null;
-  let userData = null;
+//   // Fetch organization data
+//   let organizationName = 'unknown';
+//   let userRef = null;
+//   let userData = null;
 
-  try {
-    const organisationsDoc = await firestore.collection('organisations').doc(userId).get();
+//   try {
+//     const organisationsDoc = await firestore.collection('organisations').doc(userId).get();
 
-    if (!organisationsDoc.exists) {
-      return res.status(400).json({ error: 'Bulk airtime is only available for organisations. User not found in organisations collection.' });
-    }
+//     if (!organisationsDoc.exists) {
+//       return res.status(400).json({ error: 'Bulk airtime is only available for organisations. User not found in organisations collection.' });
+//     }
 
-    userData = organisationsDoc.data();
-    userRef = organisationsDoc.ref;
-    organizationName = userData.organizationName || userData.orgName || 'unknown';
+//     userData = organisationsDoc.data();
+//     userRef = organisationsDoc.ref;
+//     organizationName = userData.organizationName || userData.orgName || 'unknown';
 
-    const currentBalance = userData.walletBalance || 0;
-    if (currentBalance < discountedTotal) {
-      return res.status(400).json({ error: 'Insufficient wallet balance.' });
-    }
+//     const currentBalance = userData.walletBalance || 0;
+//     if (currentBalance < discountedTotal) {
+//       return res.status(400).json({ error: 'Insufficient wallet balance.' });
+//     }
 
-    logger.info(`✅ Wallet check passed: userId=${userId}, balance=${currentBalance}, required=${discountedTotal}`);
-  } catch (err) {
-    logger.error('❌ Wallet balance check error:', err);
-    return res.status(400).json({ error: err.message || 'Failed to check wallet balance.' });
-  }
+//     logger.info(`✅ Wallet check passed: userId=${userId}, balance=${currentBalance}, required=${discountedTotal}`);
+//   } catch (err) {
+//     logger.error('❌ Wallet balance check error:', err);
+//     return res.status(400).json({ error: err.message || 'Failed to check wallet balance.' });
+//   }
 
-  try {
-    // Save job
-    const jobDoc = await bulkAirtimeJobsCollection.add({
-      userId,
-      organizationName,
-      requests,
-      totalAmount: discountedTotal,
-      status: 'pending',
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-      results: [],
-      currentIndex: 0
-    });
+//   try {
+//     // Save job
+//     const jobDoc = await bulkAirtimeJobsCollection.add({
+//       userId,
+//       organizationName,
+//       requests,
+//       totalAmount: discountedTotal,
+//       status: 'pending',
+//       createdAt: FieldValue.serverTimestamp(),
+//       updatedAt: FieldValue.serverTimestamp(),
+//       results: [],
+//       currentIndex: 0
+//     });
 
-    // Save transaction
-    const bulkTransactionId = `BULK_${Date.now()}_${jobDoc.id}`;
-    await bulkTransactionsCollection.doc(bulkTransactionId).set({
-      transactionID: bulkTransactionId,
-      type: 'BULK_AIRTIME_PURCHASE',
-      userId,
-      organizationName,
-      totalAmount: discountedTotal,
-      requestCount: requests.length,
-      status: 'PENDING_PROCESSING',
-      jobId: jobDoc.id,
-      createdAt: FieldValue.serverTimestamp(),
-      lastUpdated: FieldValue.serverTimestamp(),
-      actualAmountCharged: 0,
-      successfulCount: 0,
-      failedCount: 0
-    });
+//     // Save transaction
+//     const bulkTransactionId = `BULK_${Date.now()}_${jobDoc.id}`;
+//     await bulkTransactionsCollection.doc(bulkTransactionId).set({
+//       transactionID: bulkTransactionId,
+//       type: 'BULK_AIRTIME_PURCHASE',
+//       userId,
+//       organizationName,
+//       totalAmount: discountedTotal,
+//       requestCount: requests.length,
+//       status: 'PENDING_PROCESSING',
+//       jobId: jobDoc.id,
+//       createdAt: FieldValue.serverTimestamp(),
+//       lastUpdated: FieldValue.serverTimestamp(),
+//       actualAmountCharged: 0,
+//       successfulCount: 0,
+//       failedCount: 0
+//     });
 
-    logger.info(`✅ Bulk airtime job + transaction created. JobId: ${jobDoc.id}, Amount Charged: ${discountedTotal}`);
-    res.json({ jobId: jobDoc.id, bulkTransactionId });
-  } catch (err) {
-    logger.error('❌ Failed to create bulk airtime job or transaction:', err);
+//     logger.info(`✅ Bulk airtime job + transaction created. JobId: ${jobDoc.id}, Amount Charged: ${discountedTotal}`);
+//     res.json({ jobId: jobDoc.id, bulkTransactionId });
+//   } catch (err) {
+//     logger.error('❌ Failed to create bulk airtime job or transaction:', err);
 //     res.status(500).json({ error: 'Failed to create bulk airtime job.' });
 //   }
 // });
@@ -3972,68 +3972,68 @@ function generateTimestamp() {
         });
         currentIndex++;
         processed++;
-        // Wait 3 seconds before next recipient
-        if (currentIndex < requests.length) {
-          await new Promise(resolve => setTimeout(resolve, BULK_AIRTIME_RECIPIENT_DELAY));
-        }
-      }
-      // If all done, mark as completed and deduct wallet for successful sends
-      if (currentIndex >= requests.length) {
-        const successfulResults = results.filter(r => r.status === 'SUCCESS');
-        
-        // START OF FIX
-        const totalSuccessfulAmount = totalAmount; 
-        // END OF FIX
-        
-        // Check if wallet has already been deducted for this job
-        const jobData = await bulkAirtimeJobsCollection.doc(jobId).get();
-        const jobStatus = jobData.data()?.status;
-        
-        if (jobStatus === 'completed') {
-          logger.warn(`⚠️ Job ${jobId} already completed, skipping wallet deduction`);
-        } else {
-          logger.info(`💰 Deducting wallet for successful sends - jobId: ${jobId}, successfulCount: ${successfulResults.length}, totalAmount: ${totalSuccessfulAmount}`);
-          
-          try {
-            // Bulk airtime is only for organisations
-            const organisationsDoc = await firestore.collection('organisations').doc(userId).get();
-            
-            if (!organisationsDoc.exists) {
-              throw new Error('User not found in organisations collection during wallet deduction.');
-            }
-            
-            const userRef = organisationsDoc.ref;
-            
-            await firestore.runTransaction(async (tx) => {
-              const userDoc = await tx.get(userRef);
-              if (!userDoc.exists) {
-                throw new Error('User not found during wallet deduction.');
-              }
-              const userData = userDoc.data();
-              const currentBalance = userData.walletBalance || 0;
-              
-              // Deduct only the amount for successful sends
-              tx.update(userRef, {
-                walletBalance: FieldValue.increment(-totalSuccessfulAmount),
-                lastWalletUpdate: FieldValue.serverTimestamp()
-              });
-              
-              logger.info(`✅ Wallet deduction completed - userId: ${userId}, deductedAmount: ${totalSuccessfulAmount}, newBalance: ${currentBalance - totalSuccessfulAmount}`);
-            });
-          } catch (err) {
-            logger.error(`❌ Failed to deduct wallet for job ${jobId}:`, err);
-            // Continue with job completion even if wallet deduction fails
-          }
-        }
-        
-        await bulkAirtimeJobsCollection.doc(jobId).update({
-          status: 'completed',
-          updatedAt: FieldValue.serverTimestamp(),
-          totalSuccessfulAmount: totalSuccessfulAmount,
-          successfulCount: successfulResults.length,
-          failedCount: results.length - successfulResults.length
-        });
-      }
+//         // Wait 3 seconds before next recipient
+//         if (currentIndex < requests.length) {
+//           await new Promise(resolve => setTimeout(resolve, BULK_AIRTIME_RECIPIENT_DELAY));
+//         }
+//       }
+//       // If all done, mark as completed and deduct wallet for successful sends
+//       if (currentIndex >= requests.length) {
+//         const successfulResults = results.filter(r => r.status === 'SUCCESS');
+//         
+//         // START OF FIX
+//         const totalSuccessfulAmount = totalAmount; 
+//         // END OF FIX
+//         
+//         // Check if wallet has already been deducted for this job
+//         const jobData = await bulkAirtimeJobsCollection.doc(jobId).get();
+//         const jobStatus = jobData.data()?.status;
+//         
+//         if (jobStatus === 'completed') {
+//           logger.warn(`⚠️ Job ${jobId} already completed, skipping wallet deduction`);
+//         } else {
+//           logger.info(`💰 Deducting wallet for successful sends - jobId: ${jobId}, successfulCount: ${successfulResults.length}, totalAmount: ${totalSuccessfulAmount}`);
+//           
+//           try {
+//             // Bulk airtime is only for organisations
+//             const organisationsDoc = await firestore.collection('organisations').doc(userId).get();
+//             
+//             if (!organisationsDoc.exists) {
+//               throw new Error('User not found in organisations collection during wallet deduction.');
+//             }
+//             
+//             const userRef = organisationsDoc.ref;
+//             
+//             await firestore.runTransaction(async (tx) => {
+//               const userDoc = await tx.get(userRef);
+//               if (!userDoc.exists) {
+//                 throw new Error('User not found during wallet deduction.');
+//               }
+//               const userData = userDoc.data();
+//               const currentBalance = userData.walletBalance || 0;
+//               
+//               // Deduct only the amount for successful sends
+//               tx.update(userRef, {
+//                 walletBalance: FieldValue.increment(-totalSuccessfulAmount),
+//                 lastWalletUpdate: FieldValue.serverTimestamp()
+//               });
+//               
+//               logger.info(`✅ Wallet deduction completed - userId: ${userId}, deductedAmount: ${totalSuccessfulAmount}, newBalance: ${currentBalance - totalSuccessfulAmount}`);
+//             });
+//           } catch (err) {
+//             logger.error(`❌ Failed to deduct wallet for job ${jobId}:`, err);
+//             // Continue with job completion even if wallet deduction fails
+//           }
+//         }
+//         
+//         await bulkAirtimeJobsCollection.doc(jobId).update({
+//           status: 'completed',
+//           updatedAt: FieldValue.serverTimestamp(),
+//           totalSuccessfulAmount: totalSuccessfulAmount,
+//           successfulCount: successfulResults.length,
+//           failedCount: results.length - successfulResults.length
+//         });
+//       }
 //     }
 //     logger.info('✅ Bulk airtime worker completed processing cycle');
 //   } catch (err) {
