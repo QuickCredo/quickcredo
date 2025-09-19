@@ -135,7 +135,7 @@ try {
     // Force production configuration
     firestoreConfig.host = undefined;
     firestoreConfig.ssl = true;
-    firestoreConfig.port = undefined;
+    // Don't set port - let it use default
     
     console.log('⚠️ FORCED: Production Firestore mode - all emulator settings removed');
     
