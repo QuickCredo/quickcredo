@@ -1755,10 +1755,10 @@ async function processAirtimeFulfillment({
             // Only update Safaricom float balance from API response if Safaricom Dealer was used and successful
             if (targetCarrier === 'Safaricom' && airtimeDispatchResult && airtimeDispatchResult.newSafaricomFloatBalance !== undefined && airtimeProviderUsed === 'SafaricomDealer') {
                 try {
-                    await safaricomFloatDocRef.update({
+                    await safaricomFloatDocRef.set({
                         balance: airtimeDispatchResult.newSafaricomFloatBalance,
                         lastUpdated: now
-                    });
+                    }, { merge: true });
                     logger.info(`✅ Safaricom float balance directly updated from API response for TransID ${transactionId}. New balance: ${airtimeDispatchResult.newSafaricomFloatBalance}`);
                 } catch (floatUpdateErr) {
                     logger.error(`❌ Failed to directly update Safaricom float from API response for TransID ${transactionId}:`, {
@@ -1776,7 +1776,7 @@ async function processAirtimeFulfillment({
                     });
                 }
             }
-            await salesCollection.doc(finalSaleId).update(updateSaleFields);
+            await salesCollection.doc(finalSaleId).set(updateSaleFields, { merge: true });
             logger.info(`✅ Updated sale document ${finalSaleId} with dispatch result (COMPLETED).`);
 
             // --- Award driver commission if driver username was used ---
@@ -1793,10 +1793,10 @@ async function processAirtimeFulfillment({
                     
                     if (commissionAmount > 0) {
                         // Update driver's commission earned
-                        await firestore.collection('drivers').doc(driverId).update({
+                        await firestore.collection('drivers').doc(driverId).set({
                             commissionEarned: FieldValue.increment(commissionAmount),
                             lastCommissionUpdate: now
-                        });
+                        }, { merge: true });
                         
                         logger.info(`✅ Awarded commission ${commissionAmount} to driver ${driverUsername} (${driverId})`);
                         
@@ -1880,7 +1880,7 @@ async function processAirtimeFulfillment({
 
             updateSaleFields.status = 'FAILED_DISPATCH_API';
             updateSaleFields.errorMessage = saleErrorMessage;
-            await salesCollection.doc(finalSaleId).update(updateSaleFields);
+            await salesCollection.doc(finalSaleId).set(updateSaleFields, { merge: true });
             logger.info(`✅ Updated sale document ${finalSaleId} with dispatch result (FAILED).`);
 
             // --- Initiate Reversal if airtime dispatch failed ---
@@ -2264,10 +2264,10 @@ app.post('/c2b-confirmation', async (req, res) => {
                         logger.info(`💰 Driver commission calculation - driverId: ${driverId}, amount: ${amount}, carrier: ${carrier}, commissionPercentage: ${commissionPercentage}%, commissionAmount: ${commissionAmount}`);
     
                         if (commissionAmount > 0) {
-                            await userRef.update({
+                            await userRef.set({
                                 commissionEarned: FieldValue.increment(commissionAmount),
                                 lastCommissionUpdate: now
-                            });
+                            }, { merge: true });
                             logger.info(`✅ Commission awarded to driver ${driverId}: ${commissionAmount}`);
                         }
                         
@@ -2347,14 +2347,14 @@ app.post('/c2b-confirmation', async (req, res) => {
                     
                     logger.info(`💰 Bonus calculation: amount=${amount}, bonusPercentage=${bonusPercentage}%, bonusApplied=${bonusApplied}, totalToAdd=${totalToAdd}`);
                     
-                    await userRef.update({
+                    await userRef.set({
                         walletBalance: FieldValue.increment(totalToAdd),
                         lastWalletUpdate: now
-                    });
+                    }, { merge: true });
                     
                     // --- Set hasMadeFirstTopUp to true if this is the first deposit ---
                     if (!userData.hasMadeFirstTopUp) {
-                        await userRef.update({ hasMadeFirstTopUp: true });
+                        await userRef.set({ hasMadeFirstTopUp: true }, { merge: true });
                         logger.info(`🎉 Set hasMadeFirstTopUp to true for user ${userDoc.id} (${userCollection})`);
                     }
                     
@@ -2525,24 +2525,24 @@ app.post('/daraja-reversal-result', async (req, res) => {
 
         if (resultCode === 0) {
             logger.info(`✅ Reversal for TransID ${originalTransactionId} COMPLETED successfully.`);
-            await transactionRef.update({
+            await transactionRef.set({
                 status: 'REVERSED_SUCCESSFULLY',
                 reversalConfirmationDetails: result,
                 lastUpdated: FieldValue.serverTimestamp(),
-            });
-            await reconciledTransactionsCollection.doc(originalTransactionId).update({
+            }, { merge: true });
+            await reconciledTransactionsCollection.doc(originalTransactionId).set({
                 status: 'REVERSAL_CONFIRMED',
                 reversalConfirmationDetails: result,
                 lastUpdated: FieldValue.serverTimestamp(),
-            });
+            }, { merge: true });
         } else {
             logger.error(`❌ Reversal for TransID ${originalTransactionId} FAILED: ${resultDesc}`);
-            await transactionRef.update({
+            await transactionRef.set({
                 status: 'REVERSAL_FAILED_CONFIRMATION',
                 reversalConfirmationDetails: result,
                 errorMessage: `Reversal failed: ${resultDesc}`,
                 lastUpdated: FieldValue.serverTimestamp(),
-            });
+            }, { merge: true });
             await failedReconciliationsCollection.doc(originalTransactionId).set({
                 transactionId: originalTransactionId,
                 reversalConfirmationDetails: result,
@@ -3426,10 +3426,10 @@ app.post('/api/driver-airtime/sell', async (req, res) => {
         logger.info(`💰 Driver wallet sale commission calculation - driverId: ${driverId}, amount: ${amount}, carrier: ${carrier}, commissionPercentage: ${commissionPercentage}%, commissionAmount: ${commissionAmount}`);
 
         if (commissionAmount > 0) {
-              await driverRef.update({
+              await driverRef.set({
                 commissionEarned: FieldValue.increment(commissionAmount), // Track total commission earned
                 lastCommissionUpdate: FieldValue.serverTimestamp()
-            });
+            }, { merge: true });
           logger.info(`✅ Commission awarded to driver ${driverId} for wallet sale: ${commissionAmount}`);
         }
         // --- END OF COMMISSION LOGIC FOR WALLET SALES ---
@@ -3459,10 +3459,10 @@ app.post('/api/driver-airtime/sell', async (req, res) => {
         });
       } else {
       // Refund wallet if airtime failed
-        await driverRef.update({
+        await driverRef.set({
           walletBalance: FieldValue.increment(amount),
           totalTransactions: FieldValue.increment(-1)
-        });
+        }, { merge: true });
 
         res.json({
           success: false,
@@ -3684,12 +3684,12 @@ app.put('/api/driver-profile/:driverId', async (req, res) => {
     }
 
     // Update driver profile
-    await driverRef.update({
+    await driverRef.set({
       username,
       contactPerson,
       phoneNumber,
       idNumber
-    });
+    }, { merge: true });
 
     res.json({
       success: true,
@@ -4449,10 +4449,10 @@ app.post('/api/single-airtime', async (req, res) => {
 
        // Deduct wallet AFTER successful send
        try {
-        await userRef.update({
+        await userRef.set({
             walletBalance: FieldValue.increment(-totalAmount),
             lastWalletUpdate: FieldValue.serverTimestamp()
-        });
+        }, { merge: true });
         logger.info(`✅ Wallet deducted for successful single airtime send - userId: ${userId}, amount: ${totalAmount}`);
         } catch (err) {
           logger.error(`❌ Failed to deduct wallet after successful airtime send - userId: ${userId}: ${err.message}`);
@@ -4478,10 +4478,10 @@ app.post('/api/single-airtime', async (req, res) => {
                 commissionAmount = amount * (commissionPercentage / 100);
 
                 if (commissionAmount > 0) {
-                    await userRef.update({
+                    await userRef.set({
                         commissionEarned: FieldValue.increment(commissionAmount),
                         lastCommissionUpdate: FieldValue.serverTimestamp()
-                    });
+                    }, { merge: true });
                     logger.info(`✅ Commission of ${commissionAmount} awarded to driver ${userId} for single airtime sale.`);
                 }
             } catch (err) {
@@ -4529,10 +4529,10 @@ app.post('/api/single-airtime', async (req, res) => {
     } else {
         // --- REFUNDING LOGIC (UNCOMMENTED) ---
         try {
-            await userRef.update({
+            await userRef.set({
                 walletBalance: FieldValue.increment(totalAmount), // Refund the deducted amount
                 lastWalletUpdate: FieldValue.serverTimestamp()
-            });
+            }, { merge: true });
             logger.info(`✅ Wallet refunded for failed single airtime send - userId: ${userId}, refundedAmount: ${totalAmount}`);
         } catch (refundErr) {
             logger.error(`❌ Failed to refund wallet for failed single airtime send - userId: ${userId}: ${refundErr.message}`);
