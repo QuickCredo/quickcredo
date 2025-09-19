@@ -3681,7 +3681,8 @@ function generateTimestamp() {
 // --- BULK AIRTIME QUEUE ENDPOINTS ---
 // 1. Submit a bulk airtime job
 
-app.post('/api/bulk-airtime', async (req, res) => {
+// COMMENTED OUT FOR TESTING - BULK AIRTIME ENDPOINT
+// app.post('/api/bulk-airtime', async (req, res) => {
   const { requests, totalAmount, userId } = req.body;
  logger.info(`🔍 Incoming bulk-airtime payload: ${JSON.stringify(req.body)}`);
 
@@ -3785,135 +3786,135 @@ app.post('/api/bulk-airtime', async (req, res) => {
     res.json({ jobId: jobDoc.id, bulkTransactionId });
   } catch (err) {
     logger.error('❌ Failed to create bulk airtime job or transaction:', err);
-    res.status(500).json({ error: 'Failed to create bulk airtime job.' });
-  }
-});
+//     res.status(500).json({ error: 'Failed to create bulk airtime job.' });
+//   }
+// });
 
-// 2. Poll job status/results
-app.get('/api/bulk-airtime-status/:jobId', async (req, res) => {
+// 2. Poll job status/results - COMMENTED OUT FOR TESTING
+// app.get('/api/bulk-airtime-status/:jobId', async (req, res) => {
   const { jobId } = req.params;
   try {
     const jobDoc = await bulkAirtimeJobsCollection.doc(jobId).get();
     if (!jobDoc.exists) {
       return res.status(404).json({ error: 'Job not found.' });
     }
-    res.json(jobDoc.data());
-  } catch (err) {
-    console.error('Failed to fetch bulk airtime job:', err);
-    res.status(500).json({ error: 'Failed to fetch job.' });
-  }
-});
+//     res.json(jobDoc.data());
+//   } catch (err) {
+//     console.error('Failed to fetch bulk airtime job:', err);
+//     res.status(500).json({ error: 'Failed to fetch job.' });
+//   }
+// });
 
-// 3. Background worker to process jobs
-const BULK_AIRTIME_WORKER_INTERVAL = 10000; // 10 seconds
-const BULK_AIRTIME_RECIPIENT_DELAY = 3000; // 3 seconds
+// 3. Background worker to process jobs - COMMENTED OUT FOR TESTING
+// const BULK_AIRTIME_WORKER_INTERVAL = 10000; // 10 seconds
+// const BULK_AIRTIME_RECIPIENT_DELAY = 3000; // 3 seconds
 
-async function processBulkAirtimeJobs() {
-  try {
-    logger.info('🔄 Bulk airtime worker starting...');
-    console.log('🔍 DEBUG: Bulk worker - Firestore instance:', !!firestore);
-    console.log('🔍 DEBUG: Bulk worker - Collection reference:', !!bulkAirtimeJobsCollection);
+// async function processBulkAirtimeJobs() {
+//   try {
+//     logger.info('🔄 Bulk airtime worker starting...');
+//     console.log('🔍 DEBUG: Bulk worker - Firestore instance:', !!firestore);
+//     console.log('🔍 DEBUG: Bulk worker - Collection reference:', !!bulkAirtimeJobsCollection);
+//     
+//     // Get jobs with status 'pending' or 'processing'
+//     console.log('🔍 DEBUG: About to query bulkAirtimeJobsCollection...');
+//     const jobsSnap = await bulkAirtimeJobsCollection
+//       .where('status', 'in', ['pending', 'processing'])
+//       .orderBy('createdAt')
+//       .limit(2) // process up to 2 jobs at a time
+//       .get();
+//     console.log('🔍 DEBUG: Query completed successfully');
     
-    // Get jobs with status 'pending' or 'processing'
-    console.log('🔍 DEBUG: About to query bulkAirtimeJobsCollection...');
-    const jobsSnap = await bulkAirtimeJobsCollection
-      .where('status', 'in', ['pending', 'processing'])
-      .orderBy('createdAt')
-      .limit(2) // process up to 2 jobs at a time
-      .get();
-    console.log('🔍 DEBUG: Query completed successfully');
-    
-    logger.info(`📊 Found ${jobsSnap.docs.length} bulk airtime jobs to process`);
-    for (const jobDoc of jobsSnap.docs) {
-      const job = jobDoc.data();
-      const jobId = jobDoc.id;
-      let { requests, results = [], currentIndex = 0, status, organizationName, userId, totalAmount } = job;
+//     logger.info(`📊 Found ${jobsSnap.docs.length} bulk airtime jobs to process`);
+//     for (const jobDoc of jobsSnap.docs) {
+//       const job = jobDoc.data();
+//       const jobId = jobDoc.id;
+//       let { requests, results = [], currentIndex = 0, status, organizationName, userId, totalAmount } = job;
       
-      // Skip if already completed or processing
-      if (status === 'completed' || status === 'processing') {
-        logger.info(`⏭️ Skipping job ${jobId} - status: ${status}`);
-        continue;
-      }
+//       // Skip if already completed or processing
+//       if (status === 'completed' || status === 'processing') {
+//         logger.info(`⏭️ Skipping job ${jobId} - status: ${status}`);
+//         continue;
+//       }
       
-      // Mark job as processing immediately to prevent race conditions
-      await bulkAirtimeJobsCollection.doc(jobId).update({
-        status: 'processing',
-        updatedAt: FieldValue.serverTimestamp()
-      });
+//       // Mark job as processing immediately to prevent race conditions
+//       await bulkAirtimeJobsCollection.doc(jobId).update({
+//         status: 'processing',
+//         updatedAt: FieldValue.serverTimestamp()
+//       });
       
-      if (!Array.isArray(requests) || currentIndex >= requests.length) {
-        // Already done
-        await bulkAirtimeJobsCollection.doc(jobId).update({
-          status: 'completed',
-          updatedAt: FieldValue.serverTimestamp()
-        });
+//       if (!Array.isArray(requests) || currentIndex >= requests.length) {
+//         // Already done
+//         await bulkAirtimeJobsCollection.doc(jobId).update({
+//           status: 'completed',
+//           updatedAt: FieldValue.serverTimestamp()
+//         });
         
-        // Update bulk transaction status
-        const bulkTransactionQuery = await bulkTransactionsCollection
-          .where('jobId', '==', jobId)
-          .limit(1)
-          .get();
-        if (!bulkTransactionQuery.empty) {
-          const bulkTransactionDoc = bulkTransactionQuery.docs[0];
-          await bulkTransactionDoc.ref.update({
-            status: 'COMPLETED',
-            lastUpdated: FieldValue.serverTimestamp(),
-            actualAmountCharged: totalSuccessfulAmount,
-            successfulCount: successfulResults.length,
-            failedCount: results.length - successfulResults.length
-          });
-          logger.info(`✅ Updated bulk transaction with final amounts - actualCharged: ${totalSuccessfulAmount}, successful: ${successfulResults.length}, failed: ${results.length - successfulResults.length}`);
-        }
-        continue;
-      }
-      // Mark as processing
-      if (status !== 'processing') {
-        await bulkAirtimeJobsCollection.doc(jobId).update({
-          status: 'processing',
-          updatedAt: FieldValue.serverTimestamp()
-        });
-      }
-      // Process up to 5 recipients per run (to avoid long locks)
-      let processed = 0;
-      while (currentIndex < requests.length && processed < 5) {
-        const { phoneNumber, amount, telco, name } = requests[currentIndex];
+//         // Update bulk transaction status
+//         const bulkTransactionQuery = await bulkTransactionsCollection
+//           .where('jobId', '==', jobId)
+//           .limit(1)
+//           .get();
+//         if (!bulkTransactionQuery.empty) {
+//           const bulkTransactionDoc = bulkTransactionQuery.docs[0];
+//           await bulkTransactionDoc.ref.update({
+//             status: 'COMPLETED',
+//             lastUpdated: FieldValue.serverTimestamp(),
+//             actualAmountCharged: totalSuccessfulAmount,
+//             successfulCount: successfulResults.length,
+//             failedCount: results.length - successfulResults.length
+//           });
+//           logger.info(`✅ Updated bulk transaction with final amounts - actualCharged: ${totalSuccessfulAmount}, successful: ${successfulResults.length}, failed: ${results.length - successfulResults.length}`);
+//         }
+//         continue;
+//       }
+//       // Mark as processing
+//       if (status !== 'processing') {
+//         await bulkAirtimeJobsCollection.doc(jobId).update({
+//           status: 'processing',
+//           updatedAt: FieldValue.serverTimestamp()
+//         });
+//       }
+//       // Process up to 5 recipients per run (to avoid long locks)
+//       let processed = 0;
+//       while (currentIndex < requests.length && processed < 5) {
+//         const { phoneNumber, amount, telco, name } = requests[currentIndex];
         
-        // Check if this recipient has already been processed
-        if (results[currentIndex] && results[currentIndex].status) {
-          logger.info(`⏭️ Skipping already processed recipient ${currentIndex + 1}/${requests.length} - phone: ${phoneNumber}, status: ${results[currentIndex].status}`);
-          currentIndex++;
-          continue;
-        }
+//         // Check if this recipient has already been processed
+//         if (results[currentIndex] && results[currentIndex].status) {
+//           logger.info(`⏭️ Skipping already processed recipient ${currentIndex + 1}/${requests.length} - phone: ${phoneNumber}, status: ${results[currentIndex].status}`);
+//           currentIndex++;
+//           continue;
+//         }
         
-        let recipientStatus = 'FAILED';
-        let message = '';
-        let dispatchResult = null;
-        try {
-          let result;
-          if (telco && telco.toLowerCase() === 'safaricom') {
-            result = await sendSafaricomAirtime(phoneNumber, amount);
-            if (result && result.status === 'SUCCESS') {
-              recipientStatus = 'SUCCESS';
-              message = 'Airtime sent via Safaricom';
-            } else {
-              // Fallback to Africa's Talking
-              result = await sendAfricasTalkingAirtime(phoneNumber, amount, telco);
-              if (result && result.status === 'SUCCESS') {
-                recipientStatus = 'SUCCESS';
-                message = 'Airtime sent via Africa\'s Talking fallback';
-              } else {
-                message = result && result.message ? result.message : 'Both Safaricom and fallback failed';
-              }
-            }
-          } else {
-            result = await sendAfricasTalkingAirtime(phoneNumber, amount, telco);
-            if (result && result.status === 'SUCCESS') {
-              recipientStatus = 'SUCCESS';
-              message = 'Airtime sent via Africa\'s Talking';
-            } else {
-              message = result && result.message ? result.message : 'Africa\'s Talking failed';
-            }
-          }
+//         let recipientStatus = 'FAILED';
+//         let message = '';
+//         let dispatchResult = null;
+//         try {
+//           let result;
+//           if (telco && telco.toLowerCase() === 'safaricom') {
+//             result = await sendSafaricomAirtime(phoneNumber, amount);
+//             if (result && result.status === 'SUCCESS') {
+//               recipientStatus = 'SUCCESS';
+//               message = 'Airtime sent via Safaricom';
+//             } else {
+//               // Fallback to Africa's Talking
+//               result = await sendAfricasTalkingAirtime(phoneNumber, amount, telco);
+//               if (result && result.status === 'SUCCESS') {
+//                 recipientStatus = 'SUCCESS';
+//                 message = 'Airtime sent via Africa\'s Talking fallback';
+//               } else {
+//                 message = result && result.message ? result.message : 'Both Safaricom and fallback failed';
+//               }
+//             }
+//           } else {
+//             result = await sendAfricasTalkingAirtime(phoneNumber, amount, telco);
+//             if (result && result.status === 'SUCCESS') {
+//               recipientStatus = 'SUCCESS';
+//               message = 'Airtime sent via Africa\'s Talking';
+//             } else {
+//               message = result && result.message ? result.message : 'Africa\'s Talking failed';
+//             }
+//           }
           dispatchResult = result;
         } catch (err) {
           message = err.message || 'Exception during airtime dispatch';
@@ -4033,32 +4034,32 @@ async function processBulkAirtimeJobs() {
           failedCount: results.length - successfulResults.length
         });
       }
-    }
-    logger.info('✅ Bulk airtime worker completed processing cycle');
-  } catch (err) {
-    logger.error('❌ Bulk airtime worker error:', err);
-    console.error('Bulk airtime worker error:', err);
-    
-    // If there was an error, try to reset any stuck 'processing' jobs to 'pending'
-    try {
-      const stuckJobs = await bulkAirtimeJobsCollection
-        .where('status', '==', 'processing')
-        .where('updatedAt', '<', new Date(Date.now() - 5 * 60 * 1000)) // 5 minutes ago
-        .get();
-      
-      for (const stuckJob of stuckJobs.docs) {
-        await stuckJob.ref.update({
-          status: 'pending',
-          updatedAt: FieldValue.serverTimestamp()
-        });
-        logger.info(`🔄 Reset stuck job ${stuckJob.id} from processing to pending`);
-      }
-    } catch (resetError) {
-      logger.error('❌ Failed to reset stuck jobs:', resetError);
-    }
-  }
-}
-setInterval(processBulkAirtimeJobs, BULK_AIRTIME_WORKER_INTERVAL);
+//     }
+//     logger.info('✅ Bulk airtime worker completed processing cycle');
+//   } catch (err) {
+//     logger.error('❌ Bulk airtime worker error:', err);
+//     console.error('Bulk airtime worker error:', err);
+//     
+//     // If there was an error, try to reset any stuck 'processing' jobs to 'pending'
+//     try {
+//       const stuckJobs = await bulkAirtimeJobsCollection
+//         .where('status', '==', 'processing')
+//         .where('updatedAt', '<', new Date(Date.now() - 5 * 60 * 1000)) // 5 minutes ago
+//         .get();
+//       
+//       for (const stuckJob of stuckJobs.docs) {
+//         await stuckJob.ref.update({
+//           status: 'pending',
+//           updatedAt: FieldValue.serverTimestamp()
+//         });
+//         logger.info(`🔄 Reset stuck job ${stuckJob.id} from processing to pending`);
+//       }
+//     } catch (resetError) {
+//       logger.error('❌ Failed to reset stuck jobs:', resetError);
+//     }
+//   }
+// }
+// setInterval(processBulkAirtimeJobs, BULK_AIRTIME_WORKER_INTERVAL);
 // --- END BULK AIRTIME QUEUE ENDPOINTS ---
 
 // --- STK PUSH INITIATION ENDPOINT ---
