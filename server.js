@@ -115,12 +115,12 @@ try {
     // Read the service account key file
     const serviceAccountKey = require('./serviceAcountKey.json');
     console.log('✅ Service account key loaded successfully');
-    console.log('Project ID from key:', serviceAccountKey.project_id);
-    
+        console.log('Project ID from key:', serviceAccountKey.project_id);
+        
     // DEBUG: Show Firestore configuration
     const firestoreConfig = {
-        projectId: process.env.GCP_PROJECT_ID,
-        credentials: serviceAccountKey,
+            projectId: process.env.GCP_PROJECT_ID,
+            credentials: serviceAccountKey,
     };
     
     // FORCE: Completely override any emulator settings
@@ -142,11 +142,11 @@ try {
     console.log('🔍 DEBUG: Firestore config:', JSON.stringify(firestoreConfig, null, 2));
     
     firestore = new Firestore(firestoreConfig);
-    console.log('✅ Firestore initialized with credentials');
+        console.log('✅ Firestore initialized with credentials');
     console.log('🔍 DEBUG: Firestore instance created - no localhost/emulator config');
-} catch (error) {
+    } catch (error) {
     console.error('❌ Failed to load service account key:', error.message);
-    throw error;
+        throw error;
 }
 
 const transactionsCollection = firestore.collection('transactions');
@@ -2426,13 +2426,18 @@ app.post('/c2b-confirmation', async (req, res) => {
 
         if (transactionId) {
             try {
-                await transactionsCollection.doc(transactionId).update({
+                // Use set with merge instead of update to handle cases where document doesn't exist
+                await transactionsCollection.doc(transactionId).set({
+                    transactionID: transactionId,
+                    type: 'C2B_PAYMENT',
                     status: 'CRITICAL_PROCESSING_ERROR',
                     errorMessage: `Critical server error during C2B processing: ${error.message}`,
                     lastUpdated: FieldValue.serverTimestamp(),
-                });
+                    createdAt: FieldValue.serverTimestamp(),
+                    mpesaRawCallback: callbackData
+                }, { merge: true });
             } catch (updateError) {
-                logger.error(`❌ Failed to update transaction ${transactionId} after critical error:`, updateError.message);
+                logger.error(`❌ Failed to create/update transaction ${transactionId} after critical error:`, updateError.message);
             }
         }
         res.json({ "ResultCode": 0, "ResultDesc": "Internal server error during processing. Please check logs." });
