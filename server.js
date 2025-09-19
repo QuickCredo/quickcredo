@@ -1517,13 +1517,16 @@ async function processAirtimeFulfillment({
                     status: 'REVERSAL_INITIATED',
                     createdAt: now,
                 }, { merge: true });
-                await transactionsCollection.doc(transactionId).update({
+                await transactionsCollection.doc(transactionId).set({
+                    transactionID: transactionId,
+                    type: 'C2B_PAYMENT',
                     status: 'REVERSAL_PENDING_CONFIRMATION',
                     lastUpdated: now,
+                    createdAt: now,
                     reversalDetails: reversalResult.data,
                     errorMessage: reversalResult.message,
                     reversalAttempted: true,
-                });
+                }, { merge: true });
                 return { success: true, status: 'REVERSAL_INITIATED_INVALID_AMOUNT' }; // Return success as reversal was initiated
             } else {
                 logger.error(`❌ Reversal failed for invalid amount ${amountInt} for ${transactionId}: ${reversalResult.message}`);
@@ -1537,13 +1540,16 @@ async function processAirtimeFulfillment({
                     reason: `Reversal initiation failed for invalid amount: ${reversalResult.message}`,
                     createdAt: now,
                 }, { merge: true });
-                await transactionsCollection.doc(transactionId).update({
+                await transactionsCollection.doc(transactionId).set({
+                    transactionID: transactionId,
+                    type: 'C2B_PAYMENT',
                     status: 'REVERSAL_INITIATION_FAILED',
                     lastUpdated: now,
+                    createdAt: now,
                     reversalDetails: reversalResult.error,
                     errorMessage: `Reversal initiation failed for invalid amount: ${reversalResult.message}`,
                     reversalAttempted: true,
-                });
+                }, { merge: true });
                 return { success: false, status: 'REVERSAL_FAILED_INVALID_AMOUNT', error: reversalResult.message };
             }
         }
