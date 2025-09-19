@@ -2114,11 +2114,30 @@ app.post('/c2b-confirmation', async (req, res) => {
         
         if (!isPhone) {
             // Check if it's an account number first
-            const [retailersSnap, driversSnap, organisationsSnap] = await Promise.all([
-                firestore.collection('retailers').where('accountNumber', '==', BillRefNumber).limit(1).get(),
-                firestore.collection('drivers').where('accountNumber', '==', BillRefNumber).limit(1).get(),
-                firestore.collection('organisations').where('accountNumber', '==', BillRefNumber).limit(1).get()
-            ]);
+            let retailersSnap, driversSnap, organisationsSnap;
+            try {
+                [retailersSnap, driversSnap, organisationsSnap] = await Promise.all([
+                    firestore.collection('retailers').where('accountNumber', '==', BillRefNumber).limit(1).get(),
+                    firestore.collection('drivers').where('accountNumber', '==', BillRefNumber).limit(1).get(),
+                    firestore.collection('organisations').where('accountNumber', '==', BillRefNumber).limit(1).get()
+                ]);
+            } catch (collectionError) {
+                logger.warn(`⚠️ Collections not found, treating as phone number: ${collectionError.message}`);
+                // If collections don't exist, treat as phone number for airtime
+                const fulfillmentResult = await processAirtimeFulfillment({
+                    transactionId: transactionId,
+                    originalAmountPaid: amount,
+                    payerMsisdn: mpesaNumber,
+                    payerName: customerName,
+                    topupNumber: BillRefNumber,
+                    sourceCallbackData: callbackData,
+                    requestType: 'C2B',
+                    driverUsername: null,
+                    driverId: null
+                });
+                logger.info(`C2B Confirmation for TransID ${transactionId} completed. Fulfillment Result:`, fulfillmentResult);
+                return res.json({ "ResultCode": 0, "ResultDesc": "C2B Confirmation and Processing Complete." });
+            }
             
             let userDoc = null;
             let userRef = null;
