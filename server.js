@@ -105,17 +105,26 @@ console.log('GCP_KEY_FILE exists:', !!process.env.GCP_KEY_FILE);
 
 // Use service account key file for both local and Render deployment
 console.log('🔧 Using service account key file...');
+console.log('🔍 DEBUG: FIRESTORE_EMULATOR_HOST:', process.env.FIRESTORE_EMULATOR_HOST);
+console.log('🔍 DEBUG: NODE_ENV:', process.env.NODE_ENV);
+console.log('🔍 DEBUG: RENDER:', process.env.RENDER);
+
 try {
     // Read the service account key file
     const serviceAccountKey = require('./serviceAcountKey.json');
     console.log('✅ Service account key loaded successfully');
     console.log('Project ID from key:', serviceAccountKey.project_id);
     
-    firestore = new Firestore({
+    // DEBUG: Show Firestore configuration
+    const firestoreConfig = {
         projectId: process.env.GCP_PROJECT_ID,
         credentials: serviceAccountKey,
-    });
+    };
+    console.log('🔍 DEBUG: Firestore config:', JSON.stringify(firestoreConfig, null, 2));
+    
+    firestore = new Firestore(firestoreConfig);
     console.log('✅ Firestore initialized with credentials');
+    console.log('🔍 DEBUG: Firestore instance created - no localhost/emulator config');
 } catch (error) {
     console.error('❌ Failed to load service account key:', error.message);
     throw error;
@@ -3783,13 +3792,17 @@ const BULK_AIRTIME_RECIPIENT_DELAY = 3000; // 3 seconds
 async function processBulkAirtimeJobs() {
   try {
     logger.info('🔄 Bulk airtime worker starting...');
+    console.log('🔍 DEBUG: Bulk worker - Firestore instance:', !!firestore);
+    console.log('🔍 DEBUG: Bulk worker - Collection reference:', !!bulkAirtimeJobsCollection);
     
     // Get jobs with status 'pending' or 'processing'
+    console.log('🔍 DEBUG: About to query bulkAirtimeJobsCollection...');
     const jobsSnap = await bulkAirtimeJobsCollection
       .where('status', 'in', ['pending', 'processing'])
       .orderBy('createdAt')
       .limit(2) // process up to 2 jobs at a time
       .get();
+    console.log('🔍 DEBUG: Query completed successfully');
     
     logger.info(`📊 Found ${jobsSnap.docs.length} bulk airtime jobs to process`);
     for (const jobDoc of jobsSnap.docs) {
