@@ -208,7 +208,7 @@ app.use('/stk-callback', (req, res, next) => {
 // Allow specific origins (recommended for production)
 const allowedOrigins = [
     'http://localhost:3000',
-    'https://quickcredo-101.web.app',
+    'https://daimapay.com',
     'https://daimapay-51406.web.app',
     'https://daimapay.web.app',
     'https://daimapay-wallet.web.app',
@@ -1494,12 +1494,15 @@ async function processAirtimeFulfillment({
             });
 
             // Update transaction status before attempting reversal
-            await transactionsCollection.doc(transactionId).update({
+            await transactionsCollection.doc(transactionId).set({
+                transactionID: transactionId,
+                type: 'C2B_PAYMENT',
                 status: 'RECEIVED_FULFILLMENT_FAILED',
                 fulfillmentStatus: 'FAILED_INVALID_AMOUNT',
                 errorMessage: errorMessage,
                 lastUpdated: now,
-            });
+                createdAt: now,
+            }, { merge: true });
 
             const reversalResult = await initiateDarajaReversal(transactionId, originalAmountPaid, payerMsisdn);
             if (reversalResult.success) {
@@ -1828,16 +1831,19 @@ async function processAirtimeFulfillment({
             }
 
             // Also update the main transaction status to fulfilled
-            await transactionsCollection.doc(transactionId).update({
+            await transactionsCollection.doc(transactionId).set({
+                transactionID: transactionId,
+                type: 'C2B_PAYMENT',
                 status: 'COMPLETED_AND_FULFILLED',
                 fulfillmentStatus: airtimeDispatchStatus,
                 fulfillmentDetails: airtimeDispatchResult,
                 lastUpdated: now,
+                createdAt: now,
                 airtimeProviderUsed: airtimeProviderUsed,
                 driverCommissionAwarded: driverUsername ? true : false,
                 driverUsername: driverUsername || null,
                 driverId: driverId || null
-            });
+            }, { merge: true });
             logger.info(`✅ Transaction ${transactionId} marked as COMPLETED_AND_FULFILLED.`);
             return { success: true, status: 'COMPLETED_AND_FULFILLED' };
 
@@ -1875,15 +1881,18 @@ async function processAirtimeFulfillment({
             logger.warn(`🛑 Airtime dispatch ultimately failed for TransID ${transactionId}. Initiating Daraja reversal.`);
 
             // Update main transaction status to reflect immediate failure
-            await transactionsCollection.doc(transactionId).update({
+            await transactionsCollection.doc(transactionId).set({
+                transactionID: transactionId,
+                type: 'C2B_PAYMENT',
                 status: 'RECEIVED_FULFILLMENT_FAILED',
                 fulfillmentStatus: 'FAILED_DISPATCH_API',
                 fulfillmentDetails: airtimeDispatchResult,
                 errorMessage: saleErrorMessage,
                 lastUpdated: now,
+                createdAt: now,
                 airtimeProviderUsed: airtimeProviderUsed,
                 reversalAttempted: true,
-            });
+            }, { merge: true });
 
             const reversalResult = await initiateDarajaReversal(transactionId, originalAmountPaid, payerMsisdn);
 
@@ -1899,12 +1908,15 @@ async function processAirtimeFulfillment({
                     status: 'REVERSAL_INITIATED',
                     createdAt: now,
                 }, { merge: true });
-                await transactionsCollection.doc(transactionId).update({
+                await transactionsCollection.doc(transactionId).set({
+                    transactionID: transactionId,
+                    type: 'C2B_PAYMENT',
                     status: 'REVERSAL_PENDING_CONFIRMATION',
                     lastUpdated: now,
+                    createdAt: now,
                     reversalDetails: reversalResult.data,
                     errorMessage: reversalResult.message,
-                });
+                }, { merge: true });
                 return { success: true, status: 'REVERSAL_INITIATED' };
             } else {
                 logger.error(`❌ Daraja reversal failed to initiate for TransID ${transactionId}: ${reversalResult.message}`);
@@ -1918,12 +1930,15 @@ async function processAirtimeFulfillment({
                     reason: reversalResult.message,
                     createdAt: now,
                 }, { merge: true });
-                await transactionsCollection.doc(transactionId).update({
+                await transactionsCollection.doc(transactionId).set({
+                    transactionID: transactionId,
+                    type: 'C2B_PAYMENT',
                     status: 'REVERSAL_INITIATION_FAILED',
                     lastUpdated: now,
+                    createdAt: now,
                     reversalDetails: reversalResult.error,
                     errorMessage: `Reversal initiation failed: ${reversalResult.message}`
-                });
+                }, { merge: true });
                 return { success: false, status: 'REVERSAL_INITIATION_FAILED', error: reversalResult.message };
             }
         }
@@ -5146,4 +5161,3 @@ app.get('/api/user/bulk-statistics/:userId', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch user bulk statistics' });
   }
 }); 
-
