@@ -208,10 +208,7 @@ app.use('/stk-callback', (req, res, next) => {
 // Allow specific origins (recommended for production)
 const allowedOrigins = [
     'http://localhost:3000',
-    'https://daimapay.com',
-    'https://daimapay-51406.web.app',
-    'https://daimapay.web.app',
-    'https://daimapay-wallet.web.app',
+    'https://quickcredo-webpage.web.app',
     'https://new-wallet.web.app'
 ];
 app.use(cors({
@@ -2143,11 +2140,36 @@ app.post('/c2b-confirmation', async (req, res) => {
             // Check if it's an account number first
             let retailersSnap, driversSnap, organisationsSnap;
             try {
-                [retailersSnap, driversSnap, organisationsSnap] = await Promise.all([
-                    firestore.collection('retailers').where('accountNumber', '==', BillRefNumber).limit(1).get(),
-                    firestore.collection('drivers').where('accountNumber', '==', BillRefNumber).limit(1).get(),
-                    firestore.collection('organisations').where('accountNumber', '==', BillRefNumber).limit(1).get()
-                ]);
+                // Check if collections exist first
+                const collections = ['retailers', 'drivers', 'organisations'];
+                const collectionChecks = await Promise.allSettled(
+                    collections.map(collection => 
+                        firestore.collection(collection).limit(1).get()
+                    )
+                );
+                
+                // Only query collections that exist
+                const queries = [];
+                if (collectionChecks[0].status === 'fulfilled') {
+                    queries.push(firestore.collection('retailers').where('accountNumber', '==', BillRefNumber).limit(1).get());
+                } else {
+                    queries.push(Promise.resolve({ docs: [], empty: true }));
+                }
+                
+                if (collectionChecks[1].status === 'fulfilled') {
+                    queries.push(firestore.collection('drivers').where('accountNumber', '==', BillRefNumber).limit(1).get());
+                } else {
+                    queries.push(Promise.resolve({ docs: [], empty: true }));
+                }
+                
+                if (collectionChecks[2].status === 'fulfilled') {
+                    queries.push(firestore.collection('organisations').where('accountNumber', '==', BillRefNumber).limit(1).get());
+                } else {
+                    queries.push(Promise.resolve({ docs: [], empty: true }));
+                }
+                
+                [retailersSnap, driversSnap, organisationsSnap] = await Promise.all(queries);
+                
             } catch (collectionError) {
                 logger.warn(`⚠️ Collections not found, treating as phone number: ${collectionError.message}`);
                 // If collections don't exist, treat as phone number for airtime
