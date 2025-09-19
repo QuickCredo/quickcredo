@@ -1154,6 +1154,21 @@ app.post('/stk-push', stkPushLimiter, async (req, res) => {
         return res.status(400).json({ success: false, message: "Invalid recipient or customer phone number format." });
     }
 
+    // Normalize phone numbers for M-Pesa API (convert 0XXXXXXXXX to 254XXXXXXXXX)
+    const normalizePhoneForMpesa = (phone) => {
+        if (phone.startsWith('0') && phone.length === 10) {
+            return '254' + phone.slice(1); // Convert 0729137818 to 254729137818
+        } else if (phone.startsWith('254') && phone.length === 12) {
+            return phone; // Already in correct format
+        } else if (phone.startsWith('+254') && phone.length === 13) {
+            return phone.slice(1); // Convert +254729137818 to 254729137818
+        }
+        return phone; // Return as is if format is unclear
+    };
+
+    const normalizedCustomerPhone = normalizePhoneForMpesa(cleanedCustomerPhone);
+    logger.info(`📱 Phone number normalization: ${cleanedCustomerPhone} → ${normalizedCustomerPhone}`);
+
     const detectedCarrier = detectCarrier(cleanedRecipient); // Detect carrier at initiation
     if (detectedCarrier === 'Unknown') {
         logger.warn(`🛑 Unknown carrier for recipient ${cleanedRecipient}.`);
@@ -1191,9 +1206,9 @@ app.post('/stk-push', stkPushLimiter, async (req, res) => {
             Timestamp: timestamp,
             TransactionType: 'CustomerPayBillOnline', // Or 'CustomerBuyGoodsOnline' if applicable
             Amount: amountFloat, // Use the parsed float amount
-            PartyA: cleanedCustomerPhone, // Customer's phone number
+            PartyA: normalizedCustomerPhone, // Customer's phone number (normalized for M-Pesa)
             PartyB: SHORTCODE, // Your Paybill/Till number
-            PhoneNumber: cleanedCustomerPhone, // Customer's phone number
+            PhoneNumber: normalizedCustomerPhone, // Customer's phone number (normalized for M-Pesa)
             CallBackURL: STK_CALLBACK_URL,
             AccountReference: truncatedAccountRef, // Use driver username or truncated recipient number
             TransactionDesc: `Airtime for ${cleanedRecipient}`
