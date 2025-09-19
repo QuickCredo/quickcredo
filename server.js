@@ -3792,12 +3792,12 @@ function generateTimestamp() {
 
 // 2. Poll job status/results - COMMENTED OUT FOR TESTING
 // app.get('/api/bulk-airtime-status/:jobId', async (req, res) => {
-  const { jobId } = req.params;
-  try {
-    const jobDoc = await bulkAirtimeJobsCollection.doc(jobId).get();
-    if (!jobDoc.exists) {
-      return res.status(404).json({ error: 'Job not found.' });
-    }
+//   const { jobId } = req.params;
+//   try {
+//     const jobDoc = await bulkAirtimeJobsCollection.doc(jobId).get();
+//     if (!jobDoc.exists) {
+//       return res.status(404).json({ error: 'Job not found.' });
+//     }
 //     res.json(jobDoc.data());
 //   } catch (err) {
 //     console.error('Failed to fetch bulk airtime job:', err);
@@ -3915,63 +3915,63 @@ function generateTimestamp() {
 //               message = result && result.message ? result.message : 'Africa\'s Talking failed';
 //             }
 //           }
-          dispatchResult = result;
-        } catch (err) {
-          message = err.message || 'Exception during airtime dispatch';
-        }
-        results[currentIndex] = { phoneNumber, amount, telco, name, status: recipientStatus, message };
+//           dispatchResult = result;
+//         } catch (err) {
+//           message = err.message || 'Exception during airtime dispatch';
+//         }
+//         results[currentIndex] = { phoneNumber, amount, telco, name, status: recipientStatus, message };
         
-        // Create bulk sale record for successful airtime sends
-        if (recipientStatus === 'SUCCESS') {
-          // ✅ New: Update carrier float balance
-          const carrierLogicalName = telco === 'Safaricom' ? 'safaricomFloat' : 'africasTalkingFloat';
-          await updateCarrierFloatBalance(carrierLogicalName, -request.amount);
+//         // Create bulk sale record for successful airtime sends
+//         if (recipientStatus === 'SUCCESS') {
+//           // ✅ New: Update carrier float balance
+//           const carrierLogicalName = telco === 'Safaricom' ? 'safaricomFloat' : 'africasTalkingFloat';
+//           await updateCarrierFloatBalance(carrierLogicalName, -request.amount);
 
-          // ✅ New: Write bulk sale record to Firestore
-          const saleId = `BULK_SALE_${Date.now()}_${currentIndex}`;
-          logger.info(`🔄 Attempting to write bulk sale for org: ${organizationName}, saleId: ${saleId}, phoneNumber: ${phoneNumber}, amount: ${amount}`);
-          
-          try {
-            await bulkSalesCollection.doc(organizationName).collection('sales').doc(saleId).set({
-              saleId,
-              type: 'BULK_AIRTIME_SALE',
-              userId,
-              organizationName,
-              jobId,
-              phoneNumber,
-              amount,
-              telco,
-              recipientName: name,
-              status: 'SUCCESS',
-              message,
-              dispatchResult,
-              createdAt: FieldValue.serverTimestamp(),
-              lastUpdated: FieldValue.serverTimestamp()
-            });
-            logger.info(`✅ Successfully wrote bulk sale for org: ${organizationName}, saleId: ${saleId}, phoneNumber: ${phoneNumber}, amount: ${amount}`);
-          } catch (err) {
-            logger.error(`❌ Failed to write bulk sale for org: ${organizationName}, saleId: ${saleId}, phoneNumber: ${phoneNumber}, amount: ${amount}`, { 
-              error: err.message, 
-              stack: err.stack,
-              organizationName,
-              saleId,
-              phoneNumber,
-              amount,
-              jobId
-            });
-          }
-        } else {
-          logger.warn(`⚠️ Skipping bulk sale write for failed airtime send - phoneNumber: ${phoneNumber}, status: ${recipientStatus}, message: ${message}`);
-        }
-        
-        // Update job after each recipient
-        await bulkAirtimeJobsCollection.doc(jobId).update({
-          results,
-          currentIndex: currentIndex + 1,
-          updatedAt: FieldValue.serverTimestamp()
-        });
-        currentIndex++;
-        processed++;
+//           // ✅ New: Write bulk sale record to Firestore
+//           const saleId = `BULK_SALE_${Date.now()}_${currentIndex}`;
+//           logger.info(`🔄 Attempting to write bulk sale for org: ${organizationName}, saleId: ${saleId}, phoneNumber: ${phoneNumber}, amount: ${amount}`);
+//           
+//           try {
+//             await bulkSalesCollection.doc(organizationName).collection('sales').doc(saleId).set({
+//               saleId,
+//               type: 'BULK_AIRTIME_SALE',
+//               userId,
+//               organizationName,
+//               jobId,
+//               phoneNumber,
+//               amount,
+//               telco,
+//               recipientName: name,
+//               status: 'SUCCESS',
+//               message,
+//               dispatchResult,
+//               createdAt: FieldValue.serverTimestamp(),
+//               lastUpdated: FieldValue.serverTimestamp()
+//             });
+//             logger.info(`✅ Successfully wrote bulk sale for org: ${organizationName}, saleId: ${saleId}, phoneNumber: ${phoneNumber}, amount: ${amount}`);
+//           } catch (err) {
+//             logger.error(`❌ Failed to write bulk sale for org: ${organizationName}, saleId: ${saleId}, phoneNumber: ${phoneNumber}, amount: ${amount}`, { 
+//               error: err.message, 
+//               stack: err.stack,
+//               organizationName,
+//               saleId,
+//               phoneNumber,
+//               amount,
+//               jobId
+//             });
+//           }
+//         } else {
+//           logger.warn(`⚠️ Skipping bulk sale write for failed airtime send - phoneNumber: ${phoneNumber}, status: ${recipientStatus}, message: ${message}`);
+//         }
+//         
+//         // Update job after each recipient
+//         await bulkAirtimeJobsCollection.doc(jobId).update({
+//           results,
+//           currentIndex: currentIndex + 1,
+//           updatedAt: FieldValue.serverTimestamp()
+//         });
+//         currentIndex++;
+//         processed++;
 //         // Wait 3 seconds before next recipient
 //         if (currentIndex < requests.length) {
 //           await new Promise(resolve => setTimeout(resolve, BULK_AIRTIME_RECIPIENT_DELAY));
