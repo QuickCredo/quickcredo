@@ -96,10 +96,39 @@ app.use(express.urlencoded({ extended: true }));
 app.set('trust proxy', 1);
 
 // --- Firestore Initialization ---
-const firestore = new Firestore({
-    projectId: process.env.GCP_PROJECT_ID,
-    keyFilename: process.env.GCP_KEY_FILE,
-});
+let firestore;
+
+console.log('🔍 Firebase Debug Info:');
+console.log('RENDER env:', process.env.RENDER);
+console.log('GCP_PROJECT_ID:', process.env.GCP_PROJECT_ID);
+console.log('GCP_KEY_FILE exists:', !!process.env.GCP_KEY_FILE);
+
+if (process.env.RENDER) {
+    // For Render deployment - handle base64 encoded service account key
+    console.log('🔧 Using Render configuration...');
+    try {
+        const serviceAccountKey = JSON.parse(Buffer.from(process.env.GCP_KEY_FILE, 'base64').toString());
+        console.log('✅ Service account key decoded successfully');
+        console.log('Project ID from key:', serviceAccountKey.project_id);
+        
+        firestore = new Firestore({
+            projectId: process.env.GCP_PROJECT_ID,
+            credentials: serviceAccountKey,
+        });
+        console.log('✅ Firestore initialized with credentials');
+    } catch (error) {
+        console.error('❌ Failed to decode service account key:', error.message);
+        throw error;
+    }
+} else {
+    // For local development - use key file
+    console.log('🔧 Using local configuration...');
+    firestore = new Firestore({
+        projectId: process.env.GCP_PROJECT_ID,
+        keyFilename: process.env.GCP_KEY_FILE,
+    });
+    console.log('✅ Firestore initialized with key file');
+}
 
 const transactionsCollection = firestore.collection('transactions');
 const salesCollection = firestore.collection('sales');
@@ -159,7 +188,7 @@ app.use('/stk-callback', (req, res, next) => {
 });
 // Allow specific origins (recommended for production)
 const allowedOrigins = [
-    'https://www.daimapay.com',
+    'http://localhost:3000',
     'https://daimapay.com',
     'https://daimapay-51406.web.app',
     'https://daimapay.web.app',
