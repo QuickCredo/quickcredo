@@ -103,31 +103,22 @@ console.log('RENDER env:', process.env.RENDER);
 console.log('GCP_PROJECT_ID:', process.env.GCP_PROJECT_ID);
 console.log('GCP_KEY_FILE exists:', !!process.env.GCP_KEY_FILE);
 
-if (process.env.RENDER) {
-    // For Render deployment - handle base64 encoded service account key
-    console.log('🔧 Using Render configuration...');
-    try {
-        const serviceAccountKey = JSON.parse(Buffer.from(process.env.GCP_KEY_FILE, 'base64').toString());
-        console.log('✅ Service account key decoded successfully');
-        console.log('Project ID from key:', serviceAccountKey.project_id);
-        
-        firestore = new Firestore({
-            projectId: process.env.GCP_PROJECT_ID,
-            credentials: serviceAccountKey,
-        });
-        console.log('✅ Firestore initialized with credentials');
-    } catch (error) {
-        console.error('❌ Failed to decode service account key:', error.message);
-        throw error;
-    }
-} else {
-    // For local development - use key file
-    console.log('🔧 Using local configuration...');
+// Use service account key file for both local and Render deployment
+console.log('🔧 Using service account key file...');
+try {
+    // Read the service account key file
+    const serviceAccountKey = require('./serviceAcountKey.json');
+    console.log('✅ Service account key loaded successfully');
+    console.log('Project ID from key:', serviceAccountKey.project_id);
+    
     firestore = new Firestore({
         projectId: process.env.GCP_PROJECT_ID,
-        keyFilename: process.env.GCP_KEY_FILE,
+        credentials: serviceAccountKey,
     });
-    console.log('✅ Firestore initialized with key file');
+    console.log('✅ Firestore initialized with credentials');
+} catch (error) {
+    console.error('❌ Failed to load service account key:', error.message);
+    throw error;
 }
 
 const transactionsCollection = firestore.collection('transactions');
