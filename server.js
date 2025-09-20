@@ -853,6 +853,14 @@ async function sendAfricasTalkingAirtime(phoneNumber, amount, carrier) {
         logger.error('Missing Africa\'s Talking API environment variables.');
         return { status: 'FAILED', message: 'Missing Africa\'s Talking credentials.' };
     }
+    
+    // Log credential validation (without exposing actual values)
+    logger.info('🔑 Africa\'s Talking credentials check:', {
+        hasApiKey: !!process.env.AT_API_KEY,
+        hasUsername: !!process.env.AT_USERNAME,
+        apiKeyLength: process.env.AT_API_KEY?.length || 0,
+        usernameLength: process.env.AT_USERNAME?.length || 0
+    });
 
     try {
         const result = await africastalking.AIRTIME.send({
@@ -897,7 +905,12 @@ async function sendAfricasTalkingAirtime(phoneNumber, amount, carrier) {
             recipient: normalizedPhone,
             amount: amount,
             message: error.message,
-            stack: error.stack
+            status: error.response?.status,
+            statusText: error.response?.statusText,
+            responseData: error.response?.data,
+            stack: error.stack,
+            apiKeyPresent: !!process.env.AT_API_KEY,
+            usernamePresent: !!process.env.AT_USERNAME
         });
         return {
             status: 'FAILED',
@@ -3833,7 +3846,12 @@ app.post('/withdraw/result', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Missing required parameters' });
     }
 
-    logger.info(`[WITHDRAWAL CALLBACK] Processing success for driver ${driverId}, transaction ${transactionId}`);
+    // Check M-Pesa result code to determine success or failure
+    const resultCode = result.ResultCode;
+    const resultDesc = result.ResultDesc;
+    
+    logger.info(`[WITHDRAWAL CALLBACK] Processing callback for driver ${driverId}, transaction ${transactionId}`);
+    logger.info(`[WITHDRAWAL CALLBACK] M-Pesa ResultCode: ${resultCode}, ResultDesc: ${resultDesc}`);
 
     // Find the transaction in driver_transactions
     const transactionQuery = await firestore.collection('driver_transactions')
@@ -3850,16 +3868,39 @@ app.post('/withdraw/result', async (req, res) => {
     const transactionDoc = transactionQuery.docs[0];
     const transactionData = transactionDoc.data();
 
-    // Update transaction status to COMPLETED
-    await transactionDoc.ref.update({
-      status: 'COMPLETED',
-      completed_at: FieldValue.serverTimestamp(),
-      mpesa_callback_result: result,
-      lastUpdated: FieldValue.serverTimestamp()
-    });
+    // Check if M-Pesa result indicates success (ResultCode 0) or failure
+    if (resultCode === 0) {
+      // SUCCESS: Update transaction status to COMPLETED
+      await transactionDoc.ref.update({
+        status: 'COMPLETED',
+        completed_at: FieldValue.serverTimestamp(),
+        mpesa_callback_result: result,
+        lastUpdated: FieldValue.serverTimestamp()
+      });
 
-    logger.info(`[WITHDRAWAL CALLBACK] Transaction ${transactionId} marked as COMPLETED`);
-    res.status(200).json({ success: true, message: 'Transaction completed successfully' });
+      logger.info(`[WITHDRAWAL CALLBACK] Transaction ${transactionId} marked as COMPLETED (SUCCESS)`);
+      res.status(200).json({ success: true, message: 'Transaction completed successfully' });
+    } else {
+      // FAILURE: Update transaction status to FAILED and refund commission
+      await transactionDoc.ref.update({
+        status: 'FAILED',
+        failed_at: FieldValue.serverTimestamp(),
+        mpesa_callback_result: result,
+        failure_reason: resultDesc,
+        lastUpdated: FieldValue.serverTimestamp()
+      });
+
+      // Refund the commission to the driver's wallet
+      const driverRef = firestore.collection('drivers').doc(driverId);
+      await driverRef.update({
+        commissionEarned: FieldValue.increment(transactionData.amount),
+        lastUpdated: FieldValue.serverTimestamp()
+      });
+
+      logger.warn(`[WITHDRAWAL CALLBACK] Transaction ${transactionId} marked as FAILED (ResultCode: ${resultCode})`);
+      logger.info(`[WITHDRAWAL CALLBACK] Refunded KES ${transactionData.amount} to driver ${driverId} wallet`);
+      res.status(200).json({ success: true, message: 'Transaction failed and commission refunded' });
+    }
 
   } catch (error) {
     logger.error(`[WITHDRAWAL CALLBACK ERROR] Error processing success callback: ${error.message}`);
